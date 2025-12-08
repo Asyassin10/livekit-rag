@@ -1,0 +1,46 @@
+port: 7880
+bind_addresses:
+  - "0.0.0.0"
+
+rtc:
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+  # Enable TCP fallback for WebRTC
+  tcp_port: 7881
+  # UDP port for main RTC traffic
+  udp_port: 7882
+
+redis:
+  # Use in-memory storage for single-server setup
+  # For production, configure Redis
+  use_redis: false
+
+keys:
+  # API key pairs for authentication
+  # Replace with your own keys in production
+  APIvKxLq9E7Gwbm: SECRETkey123456789abcdefghijklmnop
+
+room:
+  # Room settings
+  auto_create: true
+  empty_timeout: 300
+  max_participants: 10
+
+logging:
+  level: info
+  # Available levels: debug, info, warn, error
+  sample: false
+
+turn:
+  # TURN server configuration (optional, for NAT traversal)
+  enabled: false
+  # domain: turn.example.com
+  # tls_port: 5349
+  # udp_port: 3478
+
+webhook:
+  # Webhook URLs for events
+  api_key: APIvKxLq9E7Gwbm
+  urls:
+    - http://rag-assistant:8000/webhook
