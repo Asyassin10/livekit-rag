@@ -11,7 +11,7 @@ A production-ready Python backend for a real-time voice assistant using LiveKit 
 - **Text-to-Speech**: Kokoro TTS with French voice (af_sarah)
 - **Smart Conversation Detection**: Handles greetings, thanks, and goodbyes without RAG
 - **Barge-in Support**: User can interrupt the assistant
-- **CPU Optimized**: INT8 quantization for weak VPS deployment
+- **CPU Optimized**: INT8 quantization for deployment
 
 ## Architecture
 
@@ -35,124 +35,140 @@ Conversation Detection
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Python 3.11+ (for local development)
+- Python 3.11+
+- FFmpeg (for audio processing)
 - API Keys:
   - Groq API key (https://console.groq.com/)
   - OpenRouter API key (https://openrouter.ai/)
-  - LiveKit credentials (auto-configured in docker-compose)
+  - LiveKit credentials (get from https://cloud.livekit.io or run local server)
+- Qdrant running locally or remotely
 
-## Quick Start with Docker
+## Quick Start
 
-### 1. Clone and Setup
+### Automated Setup (Recommended)
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone <repository-url>
 cd livekit-rag
 
-# Copy environment file
-cp .env.example .env
+# 2. Run setup script
+./setup.sh
 
-# Edit .env with your API keys
+# 3. Edit .env with your API keys
 nano .env
+
+# 4. Start Qdrant (in another terminal)
+# Option A: Using Docker
+docker run -p 6333:6333 qdrant/qdrant
+
+# Option B: Download and run Qdrant binary
+# See: https://qdrant.tech/documentation/quick-start/
+
+# 5. Run the application
+source venv/bin/activate
+python main.py
 ```
 
-### 2. Configure Environment Variables
+### Manual Setup
 
-Edit `.env` file:
+```bash
+# 1. Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 3. Setup environment variables
+cp .env.example .env
+nano .env  # Add your API keys
+
+# 4. Run the application
+python main.py
+```
+
+## Environment Configuration
+
+Edit `.env` file with your credentials:
 
 ```bash
 # Required API Keys
 GROQ_API_KEY=your_groq_api_key_here
 OPENROUTER_API_KEY=your_openrouter_api_key_here
 
-# LiveKit (default values work with docker-compose)
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=APIvKxLq9E7Gwbm
-LIVEKIT_API_SECRET=SECRETkey123456789abcdefghijklmnop
+# LiveKit Configuration
+# Option 1: Use LiveKit Cloud (https://cloud.livekit.io)
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_API_KEY=your_api_key
+LIVEKIT_API_SECRET=your_api_secret
 
-# Qdrant (default values)
+# Option 2: Use Local LiveKit Server
+# LIVEKIT_URL=ws://localhost:7880
+# LIVEKIT_API_KEY=devkey
+# LIVEKIT_API_SECRET=secret
+
+# Qdrant Configuration
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=harvard
-```
 
-### 3. Start Services
-
-```bash
-# Start all services (LiveKit, Qdrant, RAG Assistant)
-docker-compose up -d
-
-# View logs
-docker-compose logs -f rag-assistant
-```
-
-### 4. Verify Services
-
-```bash
-# Check health
-curl http://localhost:8000/health
-
-# Check LiveKit
-curl http://localhost:7880
-
-# Check Qdrant
-curl http://localhost:6333/health
-```
-
-## Local Development Setup
-
-### 1. Install Dependencies
-
-```bash
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install requirements
-pip install -r requirements.txt
-```
-
-### 2. Setup Qdrant Collection
-
-```bash
-# Start Qdrant only
-docker-compose up -d qdrant
-
-# Create collection and upload data
-python scripts/setup_qdrant.py
-```
-
-### 3. Run Application
-
-```bash
-# Set environment variables
-export $(cat .env | xargs)
-
-# Run the agent
-python main.py
-
-# Or run with uvicorn for FastAPI only
-uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Optional: Model Settings (defaults in config.py)
+WHISPER_MODEL=small
+WHISPER_LANGUAGE=fr
+WHISPER_COMPUTE_TYPE=int8
 ```
 
 ## Project Structure
 
 ```
 livekit-rag/
-├── main.py                 # FastAPI app + LiveKit agent
-├── config.py               # Configuration and settings
-├── stt.py                  # Faster-Whisper speech-to-text
-├── rag.py                  # Qdrant retrieval system
-├── llm.py                  # Groq LLM streaming
-├── tts.py                  # Kokoro TTS synthesis
-├── requirements.txt        # Python dependencies
-├── Dockerfile              # Container image
-├── docker-compose.yml      # Multi-service orchestration
-├── livekit-config.yaml     # LiveKit server configuration
-├── .env.example            # Environment variables template
-└── README.md               # This file
+├── main.py              # FastAPI app + LiveKit agent
+├── config.py            # Configuration and settings
+├── stt.py               # Faster-Whisper speech-to-text
+├── rag.py               # Qdrant retrieval system
+├── llm.py               # Groq LLM streaming
+├── tts.py               # Kokoro TTS synthesis
+├── requirements.txt     # Python dependencies
+├── setup.sh             # Automated setup script
+├── .env.example         # Environment variables template
+└── README.md            # This file
 ```
+
+## System Requirements
+
+### Minimum
+- 4 CPU cores
+- 4GB RAM
+- 10GB disk space (for models)
+
+### Recommended
+- 8 CPU cores
+- 8GB RAM
+- 20GB disk space
+
+### Dependencies
+- Python 3.11+
+- FFmpeg
+- libsndfile1
+
+### Install System Dependencies
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install -y python3 python3-venv python3-pip ffmpeg libsndfile1
+```
+
+**macOS:**
+```bash
+brew install python@3.11 ffmpeg libsndfile
+```
+
+**Windows:**
+- Install Python 3.11+ from python.org
+- Install FFmpeg from ffmpeg.org
+- Install libsndfile
 
 ## Configuration
 
@@ -190,62 +206,21 @@ livekit-rag/
 **Thanks**: merci, merci beaucoup, je te remercie
 **Goodbyes**: au revoir, bye, à bientôt, à plus, ciao
 
-## API Endpoints
-
-### Health Check
-```bash
-GET /health
-```
-
-### Root
-```bash
-GET /
-```
-
-### Webhook (LiveKit Events)
-```bash
-POST /webhook
-```
-
-## LiveKit Integration
-
-### Connect to Room
-
-```python
-from livekit import api
-
-# Generate access token
-token = api.AccessToken(
-    api_key="APIvKxLq9E7Gwbm",
-    api_secret="SECRETkey123456789abcdefghijklmnop"
-)
-
-token.with_identity("user-id")
-token.with_name("User Name")
-token.with_grants(api.VideoGrants(
-    room_join=True,
-    room="my-room"
-))
-
-access_token = token.to_jwt()
-```
-
-### Client Connection (JavaScript)
-
-```javascript
-import { Room } from 'livekit-client';
-
-const room = new Room();
-await room.connect('ws://localhost:7880', accessToken);
-
-// Publish microphone
-const audioTrack = await room.localParticipant.createAudioTrack();
-await room.localParticipant.publishTrack(audioTrack);
-```
-
 ## Qdrant Setup
 
-### Create Collection
+### 1. Start Qdrant
+
+**Using Docker:**
+```bash
+docker run -p 6333:6333 -p 6334:6334 \
+    -v $(pwd)/qdrant_storage:/qdrant/storage \
+    qdrant/qdrant
+```
+
+**Using Binary:**
+Download from https://qdrant.tech/documentation/quick-start/
+
+### 2. Create Collection
 
 ```python
 from qdrant_client import QdrantClient
@@ -253,6 +228,7 @@ from qdrant_client.models import Distance, VectorParams
 
 client = QdrantClient(url="http://localhost:6333")
 
+# Create collection
 client.create_collection(
     collection_name="harvard",
     vectors_config=VectorParams(
@@ -262,113 +238,186 @@ client.create_collection(
 )
 ```
 
-### Upload Documents
+### 3. Upload Documents
 
 ```python
-# Upload with embeddings
-client.upsert(
-    collection_name="harvard",
-    points=[
-        {
-            "id": 1,
-            "vector": embedding_vector,
-            "payload": {
-                "text": "Document content...",
-                "metadata": {}
-            }
-        }
+# Get embeddings and upload
+from rag import get_rag
+import asyncio
+
+async def upload_documents():
+    rag = get_rag()
+
+    documents = [
+        "Harvard University was founded in 1636...",
+        "The Harvard Library system is the oldest...",
+        # Add your documents
     ]
-)
+
+    for i, doc in enumerate(documents):
+        embedding = await rag.get_embedding(doc)
+        rag.qdrant_client.upsert(
+            collection_name="harvard",
+            points=[{
+                "id": i,
+                "vector": embedding,
+                "payload": {"text": doc}
+            }]
+        )
+
+asyncio.run(upload_documents())
 ```
 
-## Performance Optimization
+## Running the Application
 
-### For Weak VPS (CPU Only)
+### Start the LiveKit Agent
 
-1. **Whisper INT8 Quantization**: Reduces memory and increases speed
-2. **Streaming TTS**: Start speaking before LLM completes
-3. **Model Caching**: Pre-download models to `/root/.cache`
-4. **Resource Limits**: Configure in docker-compose.yml
+```bash
+# Activate virtual environment
+source venv/bin/activate
 
-```yaml
-deploy:
-  resources:
-    limits:
-      cpus: '4'
-      memory: 4G
+# Run the agent
+python main.py
 ```
 
-### Recommended VPS Specs
+The agent will:
+1. Connect to LiveKit server
+2. Initialize AI models (Whisper, Kokoro)
+3. Wait for participants to join rooms
+4. Process audio streams in real-time
 
-- **Minimum**: 4 CPU cores, 4GB RAM
-- **Recommended**: 8 CPU cores, 8GB RAM
-- **Storage**: 20GB (for models)
+### Testing the Setup
+
+```bash
+# Test FastAPI endpoints
+curl http://localhost:8000/health
+
+# Test Qdrant
+curl http://localhost:6333/health
+
+# Test collection
+curl http://localhost:6333/collections/harvard
+```
+
+## API Endpoints
+
+### Health Check
+```bash
+GET http://localhost:8000/health
+```
+
+### Root
+```bash
+GET http://localhost:8000/
+```
+
+### Webhook (LiveKit Events)
+```bash
+POST http://localhost:8000/webhook
+```
+
+## LiveKit Integration
+
+### Using LiveKit Cloud
+
+1. Sign up at https://cloud.livekit.io
+2. Create a project
+3. Get API credentials
+4. Update `.env` with your credentials
+
+### Using Local LiveKit Server
+
+Download and run LiveKit server:
+```bash
+# Download LiveKit server
+wget https://github.com/livekit/livekit/releases/download/v1.5.3/livekit_1.5.3_linux_amd64.tar.gz
+tar -xvf livekit_1.5.3_linux_amd64.tar.gz
+
+# Create config file
+cat > livekit.yaml <<EOF
+port: 7880
+rtc:
+  port_range_start: 50000
+  port_range_end: 50100
+keys:
+  devkey: secret
+EOF
+
+# Run server
+./livekit-server --config livekit.yaml
+```
 
 ## Troubleshooting
 
-### Issue: Models Download Slowly
+### Issue: ModuleNotFoundError
 
-**Solution**: Pre-download models before deployment
-
+**Solution**: Make sure virtual environment is activated and dependencies installed
 ```bash
-# Run container once to download models
-docker-compose run rag-assistant python -c "from stt import get_stt; get_stt()"
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Issue: FFmpeg not found
+
+**Solution**: Install FFmpeg
+```bash
+# Ubuntu/Debian
+sudo apt install ffmpeg
+
+# macOS
+brew install ffmpeg
 ```
 
 ### Issue: Qdrant Connection Failed
 
-**Solution**: Ensure Qdrant is running and collection exists
-
+**Solution**: Ensure Qdrant is running
 ```bash
 # Check Qdrant status
-curl http://localhost:6333/collections/harvard
+curl http://localhost:6333/health
+
+# Start Qdrant if not running
+docker run -p 6333:6333 qdrant/qdrant
 ```
 
-### Issue: LiveKit Connection Failed
+### Issue: Models Download Slowly
 
-**Solution**: Check firewall and port forwarding
-
+**Solution**: Models download on first run. Be patient or pre-download:
 ```bash
-# Test LiveKit server
-curl http://localhost:7880
+python -c "from stt import get_stt; get_stt()"
+python -c "from tts import get_tts; get_tts()"
 ```
 
 ### Issue: High CPU Usage
 
-**Solution**: Adjust model sizes and concurrency
-
-- Use `tiny` or `base` Whisper model
-- Reduce `RAG_TOP_K` value
+**Solution**: Adjust model sizes
+- Use `tiny` or `base` Whisper model instead of `small`
+- Reduce `RAG_TOP_K` in config
 - Limit concurrent sessions
 
-## Production Deployment
+### Issue: LiveKit Connection Failed
 
-### 1. Security Hardening
+**Solution**: Check your LiveKit configuration
+- Verify URL format (ws:// or wss://)
+- Check API key and secret
+- Test LiveKit server connectivity
 
-- Change default LiveKit API keys
-- Use HTTPS/WSS for LiveKit
-- Enable authentication
-- Configure CORS properly
+## Performance Optimization
 
-### 2. Scaling
+### For CPU-Only Systems
 
-- Use Redis for LiveKit multi-node setup
-- Deploy Qdrant cluster
-- Load balance with Nginx/Traefik
-- Use external object storage for models
+1. **Whisper INT8 Quantization**: Already enabled (configured in config.py)
+2. **Streaming TTS**: Starts speaking before LLM completes
+3. **Model Caching**: Models cached after first download
+4. **Batch Processing**: Adjust RAG_TOP_K for faster retrieval
 
-### 3. Monitoring
+### Reduce Memory Usage
 
-- Add Prometheus metrics
-- Configure logging aggregation
-- Setup health check alerts
-- Monitor resource usage
-
-### 4. Backup
-
-- Backup Qdrant data regularly
-- Store model weights externally
-- Version control configuration
+```python
+# In config.py, adjust:
+WHISPER_MODEL = "tiny"  # or "base" instead of "small"
+RAG_TOP_K = 2  # instead of 3
+LLM_MAX_TOKENS = 100  # instead of 150
+```
 
 ## System Prompt
 
@@ -379,6 +428,32 @@ Tu es l'assistant vocal de Harvard. Réponds en français, 1-2 phrases max.
 Utilise uniquement le contexte fourni. Si pas d'info, dis: Je n'ai pas cette information.
 ```
 
+## Development
+
+### Run in Development Mode
+
+```bash
+# Activate venv
+source venv/bin/activate
+
+# Run with auto-reload
+python main.py
+
+# Or use uvicorn for FastAPI
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Add Custom Responses
+
+Edit `config.py` to add custom conversation responses:
+
+```python
+GREETING_RESPONSES = [
+    "Bonjour! Comment puis-je vous aider?",
+    # Add your custom greetings
+]
+```
+
 ## License
 
 MIT License
@@ -386,12 +461,7 @@ MIT License
 ## Support
 
 For issues and questions:
-- GitHub Issues: [repository-url]/issues
-- Documentation: [repository-url]/wiki
-
-## Contributing
-
-Contributions welcome! Please read CONTRIBUTING.md first.
+- GitHub Issues: <repository-url>/issues
 
 ## Acknowledgments
 
