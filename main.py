@@ -4,21 +4,22 @@ Main application: FastAPI + LiveKit Agent for Speech-to-Speech RAG Assistant
 import asyncio
 import logging
 import random
-from typing import Optional
+from typing import Optional, Annotated
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from livekit import rtc
 from livekit.agents import (
-    AutoSubscribe,
+    Agent,
+    AgentSession,
     JobContext,
     JobProcess,
+    RunContext,
     WorkerOptions,
     cli,
-    llm,
+    function_tool,
 )
-from livekit.agents.pipeline import VoicePipelineAgent
 from livekit.plugins import silero
 
 from config import (
@@ -38,6 +39,18 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+
+# Initialize RAG components globally
+rag_instance = None
+
+
+def get_rag_instance():
+    """Get or create RAG instance"""
+    global rag_instance
+    if rag_instance is None:
+        rag_instance = get_rag()
+    return rag_instance
 
 
 class ConversationDetector:
@@ -73,137 +86,40 @@ class ConversationDetector:
         return None
 
 
-class SpeechRAGAssistant:
-    """Speech-to-Speech RAG Assistant"""
-
-    def __init__(self):
-        """Initialize assistant components"""
-        self.stt = get_stt()
-        self.rag = get_rag()
-        self.llm = get_llm()
-        self.tts = get_tts()
-        self.conversation_detector = ConversationDetector()
-        self.is_speaking = False
-        logger.info("Speech RAG Assistant initialized")
-
-    async def process_user_input(
-        self, text: str, room: rtc.Room, participant: rtc.Participant
-    ):
-        """
-        Process user input and generate response
-
-        Args:
-            text: Transcribed user input
-            room: LiveKit room
-            participant: User participant
-        """
-        try:
-            logger.info(f"Processing user input: {text}")
-
-            # Check for conversation cues (greeting, thanks, goodbye)
-            quick_response = self.conversation_detector.get_response(text)
-
-            if quick_response:
-                # Respond without RAG for conversational messages
-                logger.info(f"Quick response: {quick_response}")
-                await self.speak(quick_response, room)
-            else:
-                # Use RAG pipeline for knowledge queries
-                await self.process_rag_query(text, room)
-
-        except Exception as e:
-            logger.error(f"Error processing user input: {e}")
-            await self.speak(
-                "Désolé, une erreur s'est produite.", room
-            )
-
-    async def process_rag_query(self, query: str, room: rtc.Room):
-        """
-        Process query using RAG pipeline
-
-        Args:
-            query: User query
-            room: LiveKit room
-        """
-        try:
-            # 1. Retrieve relevant documents
-            documents = await self.rag.retrieve(query)
-
-            # 2. Format context
-            context = self.rag.format_context(documents)
-
-            if context:
-                logger.info(f"Retrieved {len(documents)} documents")
-            else:
-                logger.info("No relevant documents found")
-
-            # 3. Stream LLM response
-            response_text = ""
-            async for chunk in self.llm.stream_response(query, context):
-                response_text += chunk
-
-            # 4. Synthesize and speak response
-            if response_text:
-                await self.speak(response_text, room)
-
-        except Exception as e:
-            logger.error(f"Error in RAG query: {e}")
-            await self.speak(
-                "Je n'ai pas pu trouver d'information sur ce sujet.", room
-            )
-
-    async def speak(self, text: str, room: rtc.Room):
-        """
-        Synthesize speech and send to room
-
-        Args:
-            text: Text to speak
-            room: LiveKit room
-        """
-        try:
-            self.is_speaking = True
-            logger.info(f"Speaking: {text}")
-
-            # Synthesize audio with streaming
-            audio_source = rtc.AudioSource(24000, 1)  # 24kHz, mono
-            track = rtc.LocalAudioTrack.create_audio_track("assistant-voice", audio_source)
-
-            # Publish track
-            options = rtc.TrackPublishOptions()
-            options.source = rtc.TrackSource.SOURCE_MICROPHONE
-            publication = await room.local_participant.publish_track(track, options)
-
-            # Stream TTS audio
-            async for audio_chunk in self.tts.synthesize_stream(text):
-                if audio_chunk:
-                    # Convert WAV bytes to PCM frames
-                    # Skip WAV header (44 bytes) and send raw PCM data
-                    pcm_data = audio_chunk[44:]
-
-                    # Create audio frame
-                    frame = rtc.AudioFrame(
-                        data=pcm_data,
-                        sample_rate=24000,
-                        num_channels=1,
-                        samples_per_channel=len(pcm_data) // 2,
-                    )
-                    await audio_source.capture_frame(frame)
-
-            # Unpublish track
-            await room.local_participant.unpublish_track(track.sid)
-            self.is_speaking = False
-
-        except Exception as e:
-            logger.error(f"Error speaking: {e}")
-            self.is_speaking = False
-
-    def should_interrupt(self) -> bool:
-        """Check if assistant should be interrupted (barge-in)"""
-        return self.is_speaking
+@function_tool
+async def search_knowledge_base(
+    context: RunContext,
+    query: Annotated[str, "The search query to find relevant information"],
+) -> str:
+    """
+    Search the Harvard knowledge base for relevant information.
+    Use this tool to answer questions about Harvard University.
+    """
+    try:
+        rag = get_rag_instance()
+        
+        # Retrieve relevant documents
+        documents = await rag.retrieve(query)
+        
+        # Format context
+        result = rag.format_context(documents)
+        
+        if result:
+            logger.info(f"RAG retrieved {len(documents)} documents for query: {query}")
+            return result
+        else:
+            logger.info(f"No relevant documents found for query: {query}")
+            return "No relevant information found in the knowledge base."
+            
+    except Exception as e:
+        logger.error(f"Error in RAG search: {e}")
+        return f"Error searching knowledge base: {str(e)}"
 
 
-# Global assistant instance
-assistant: Optional[SpeechRAGAssistant] = None
+def prewarm(proc: JobProcess):
+    """Prewarm function to load VAD model"""
+    proc.userdata["vad"] = silero.VAD.load()
+    logger.info("VAD model prewarmed")
 
 
 async def entrypoint(ctx: JobContext):
@@ -213,59 +129,54 @@ async def entrypoint(ctx: JobContext):
     Args:
         ctx: Job context from LiveKit
     """
-    global assistant
-
     logger.info("Agent starting")
 
-    # Initialize assistant
-    if assistant is None:
-        assistant = SpeechRAGAssistant()
-
     # Connect to room
-    await ctx.connect(auto_subscribe=AutoSubscribe.AUDIO_ONLY)
+    await ctx.connect()
     logger.info(f"Connected to room: {ctx.room.name}")
 
-    # Setup audio streaming
+    # Wait for participant
     participant = await ctx.wait_for_participant()
     logger.info(f"Participant joined: {participant.identity}")
 
-    # Audio buffer for streaming
-    audio_buffer = bytearray()
+    # Create the agent with instructions and tools
+    agent = Agent(
+        instructions="""Tu es l'assistant vocal de Harvard University. Tu parles en français.
+        
+Ton rôle est d'aider les utilisateurs avec des informations sur Harvard University.
+Utilise l'outil search_knowledge_base pour rechercher des informations pertinentes avant de répondre.
 
-    @ctx.room.on("track_subscribed")
-    def on_track_subscribed(
-        track: rtc.Track,
-        publication: rtc.TrackPublication,
-        participant: rtc.RemoteParticipant,
-    ):
-        """Handle new audio track"""
-        if track.kind == rtc.TrackKind.KIND_AUDIO:
-            logger.info(f"Audio track subscribed: {track.sid}")
-
-            audio_stream = rtc.AudioStream(track)
-            asyncio.create_task(process_audio_stream(audio_stream, ctx.room, participant))
-
-    async def process_audio_stream(
-        audio_stream: rtc.AudioStream,
-        room: rtc.Room,
-        participant: rtc.RemoteParticipant,
-    ):
-        """Process incoming audio stream"""
-        logger.info("Processing audio stream")
-
-        async for event in audio_stream:
-            # Collect audio frames
-            # In production, implement proper VAD and buffering
-            # For now, we process on silence detection
-            pass
-
-    # Send initial greeting
-    await assistant.speak(
-        "Bonjour! Je suis l'assistant vocal de Harvard. Comment puis-je vous aider?",
-        ctx.room,
+Règles importantes:
+- Réponds toujours en français
+- Sois concis et clair dans tes réponses vocales
+- Utilise des phrases courtes adaptées à la conversation orale
+- Si tu ne trouves pas l'information, dis-le poliment
+- Pour les salutations simples, réponds naturellement sans utiliser l'outil de recherche
+""",
+        tools=[search_knowledge_base],
     )
 
-    # Keep agent running
+    # Create agent session with VAD, STT, LLM, TTS
+    # Using plugin strings - adjust these based on your providers
+    session = AgentSession(
+        vad=ctx.proc.userdata["vad"],
+        # Use your preferred STT provider
+        stt=settings.STT_PROVIDER if hasattr(settings, 'STT_PROVIDER') else "deepgram/nova-2",
+        # Use your preferred LLM provider  
+        llm=settings.LLM_PROVIDER if hasattr(settings, 'LLM_PROVIDER') else "openai/gpt-4o-mini",
+        # Use your preferred TTS provider
+        tts=settings.TTS_PROVIDER if hasattr(settings, 'TTS_PROVIDER') else "cartesia/sonic",
+    )
+
+    # Start the session
+    await session.start(agent=agent, room=ctx.room)
+    logger.info("Agent session started")
+
+    # Send initial greeting
+    await session.generate_reply(
+        instructions="Salue l'utilisateur et présente-toi comme l'assistant vocal de Harvard. Demande comment tu peux aider."
+    )
+
     logger.info("Agent running")
 
 
@@ -275,9 +186,8 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     logger.info("Starting application")
 
-    # Initialize components
-    global assistant
-    assistant = SpeechRAGAssistant()
+    # Initialize RAG instance
+    get_rag_instance()
 
     yield
 
@@ -326,6 +236,7 @@ def main():
     cli.run_app(
         WorkerOptions(
             entrypoint_fnc=entrypoint,
+            prewarm_fnc=prewarm,
             api_key=settings.LIVEKIT_API_KEY,
             api_secret=settings.LIVEKIT_API_SECRET,
             ws_url=settings.LIVEKIT_URL,
