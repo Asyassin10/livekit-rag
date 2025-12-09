@@ -6,8 +6,7 @@ import logging
 import io
 import numpy as np
 from typing import AsyncGenerator, Optional
-import torch
-from kokoro import KPipeline
+from kokoro_onnx import Kokoro
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -20,12 +19,8 @@ class TextToSpeech:
         """Initialize Kokoro TTS pipeline"""
         logger.info(f"Loading Kokoro TTS with voice: {settings.TTS_VOICE}")
 
-        # Initialize Kokoro pipeline
-        # Use CPU for inference
-        self.device = "cpu"
-        self.pipeline = KPipeline(lang_code="fr", device=self.device)
-
-        # Set voice
+        # Initialize Kokoro
+        self.kokoro = Kokoro(settings.TTS_VOICE, settings.WHISPER_LANGUAGE)
         self.voice = settings.TTS_VOICE
         self.speed = settings.TTS_SPEED
 
@@ -49,14 +44,11 @@ class TextToSpeech:
             logger.info(f"Synthesizing: {text[:100]}...")
 
             # Generate audio using Kokoro
-            audio = self.pipeline(
-                text,
-                voice=self.voice,
-                speed=self.speed,
-            )
+            # Returns tuple: (audio_array, sample_rate)
+            audio, sample_rate = self.kokoro.create(text, speed=self.speed)
 
             # Convert to WAV bytes
-            audio_bytes = self._to_wav_bytes(audio)
+            audio_bytes = self._to_wav_bytes(audio, sample_rate)
             return audio_bytes
 
         except Exception as e:
@@ -126,7 +118,7 @@ class TextToSpeech:
 
         Args:
             audio: Audio numpy array
-            sample_rate: Sample rate (default: 24000 Hz)
+            sample_rate: Sample rate
 
         Returns:
             WAV format bytes
