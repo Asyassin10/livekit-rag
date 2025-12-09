@@ -1,33 +1,33 @@
 # FastAPI and server
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-python-multipart==0.0.6
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.6
 
 # LiveKit
-livekit==0.11.0
-livekit-agents==0.8.0
-livekit-plugins-silero==0.6.0
+livekit>=0.12.0
+livekit-agents>=0.8.0
+livekit-plugins-silero>=0.6.0
 
 # Speech-to-Text
-faster-whisper==1.0.0
+faster-whisper>=1.0.0
 
 # RAG and Vector Database
-qdrant-client==1.7.3
-httpx==0.26.0
+qdrant-client>=1.7.0
+httpx>=0.26.0
 
 # LLM
-groq==0.4.2
+groq>=0.4.2
 
 # TTS
-kokoro-onnx==0.1.0
-numpy==1.24.3
-torch==2.1.2
-soundfile==0.12.1
+kokoro-onnx>=0.4.9
+numpy>=1.24.0,<2.0.0
+torch>=2.1.0
+soundfile>=0.12.0
 
 # Configuration
-pydantic==2.5.3
-pydantic-settings==2.1.0
-python-dotenv==1.0.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+python-dotenv>=1.0.0
 
 # Utilities
-aiofiles==23.2.1
+aiofiles>=23.2.0
