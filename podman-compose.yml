@@ -4,7 +4,9 @@ services:
   livekit:
     image: livekit/livekit-server:latest
     container_name: livekit-server
-    command: ["--dev", "--bind", "0.0.0.0"]
+    command: ["--config", "/livekit.yaml"]
+    volumes:
+      - ./livekit-config.yaml:/livekit.yaml:ro
     ports:
       - "7880:7880"
       - "7881:7881"
