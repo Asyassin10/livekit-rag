@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     # API Keys
     GROQ_API_KEY: str
     OPENROUTER_API_KEY: str
+    DEEPGRAM_API_KEY: str  # For STT
+    OPENAI_API_KEY: str    # For LLM and TTS
     LIVEKIT_URL: str
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
