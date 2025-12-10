@@ -1,632 +1,224 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LiveKit RAG Voice Assistant Test Client</title>
-    <script src="https://unpkg.com/livekit-client/dist/livekit-client.umd.min.js"></script>
+    <title>Harvard Voice Assistant</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
             padding: 20px;
-        }
-
-        .container {
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 800px;
-            width: 100%;
-            padding: 40px;
-        }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
             text-align: center;
-        }
-
-        .subtitle {
-            text-align: center;
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-
-        .config-section {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #555;
-            font-weight: 500;
-            font-size: 14px;
-        }
-
-        input[type="text"], input[type="password"] {
-            width: 100%;
-            padding: 12px;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        input[type="text"]:focus, input[type="password"]:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .button-group {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
         }
 
         button {
-            flex: 1;
             padding: 15px 30px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
+            font-size: 18px;
+            margin: 10px;
             cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            border: none;
+            border-radius: 5px;
+            background: #007bff;
+            color: white;
         }
 
         button:disabled {
-            opacity: 0.5;
+            background: #ccc;
             cursor: not-allowed;
         }
 
-        .btn-connect {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .btn-connect:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-
-        .btn-disconnect {
-            background: #ff6b6b;
-            color: white;
-        }
-
-        .btn-disconnect:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 107, 107, 0.4);
-        }
-
-        .btn-generate {
-            background: #51cf66;
-            color: white;
-        }
-
-        .btn-generate:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(81, 207, 102, 0.4);
-        }
-
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-weight: 500;
-            text-align: center;
-            transition: all 0.3s;
-        }
-
-        .status.disconnected {
-            background: #ffe0e0;
-            color: #c92a2a;
-        }
-
-        .status.connecting {
-            background: #fff3bf;
-            color: #e67700;
-        }
-
-        .status.connected {
-            background: #d3f9d8;
-            color: #2b8a3e;
-        }
-
-        .transcription-box {
-            background: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
+        #status {
+            margin-top: 30px;
             padding: 20px;
-            margin-bottom: 20px;
-            min-height: 150px;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-
-        .transcription-box h3 {
-            color: #333;
-            margin-bottom: 15px;
-            font-size: 18px;
-        }
-
-        .message {
-            margin-bottom: 15px;
-            padding: 10px;
             border-radius: 8px;
-            animation: fadeIn 0.3s;
+            background: #f0f0f0;
+            font-size: 16px;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .connected {
+            background: #d4edda !important;
+            color: #155724;
         }
 
-        .message.user {
-            background: #e7f5ff;
-            color: #1971c2;
-            margin-left: 20px;
+        .error {
+            background: #f8d7da !important;
+            color: #721c24;
         }
 
-        .message.assistant {
-            background: #d3f9d8;
-            color: #2b8a3e;
-            margin-right: 20px;
-        }
-
-        .message.system {
-            background: #fff3bf;
-            color: #e67700;
-            font-style: italic;
-            text-align: center;
-        }
-
-        .timestamp {
-            font-size: 11px;
-            opacity: 0.7;
-            margin-bottom: 5px;
-        }
-
-        .stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .stat-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .stat-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            color: #333;
-        }
-
-        .audio-indicator {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 5px;
-            padding: 10px;
-            margin-bottom: 20px;
-        }
-
-        .audio-bar {
-            width: 4px;
-            height: 20px;
-            background: #667eea;
-            border-radius: 2px;
-            animation: pulse 1s ease-in-out infinite;
-        }
-
-        .audio-bar:nth-child(2) { animation-delay: 0.1s; }
-        .audio-bar:nth-child(3) { animation-delay: 0.2s; }
-        .audio-bar:nth-child(4) { animation-delay: 0.3s; }
-        .audio-bar:nth-child(5) { animation-delay: 0.4s; }
-
-        @keyframes pulse {
-            0%, 100% { height: 20px; opacity: 0.3; }
-            50% { height: 40px; opacity: 1; }
-        }
-
-        .hidden {
-            display: none;
-        }
-
-        .info-box {
-            background: #e7f5ff;
-            border-left: 4px solid #1971c2;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-
-        .info-box strong {
-            color: #1971c2;
-        }
-
-        .error-box {
-            background: #ffe0e0;
-            border-left: 4px solid #c92a2a;
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            color: #c92a2a;
+        .warning {
+            background: #fff3cd !important;
+            color: #856404;
         }
     </style>
 </head>
+
 <body>
-    <div class="container">
-        <h1>🎤 LiveKit RAG Voice Assistant</h1>
-        <div class="subtitle">Speech-to-Speech AI Assistant Test Client</div>
+    <h1>🎓 Harvard Voice Assistant</h1>
+    <p>مساعد صوتي ذكي لجامعة هارفارد</p>
 
-        <div class="info-box">
-            <strong>📋 Instructions:</strong> Configure your LiveKit server details below, generate a token, then connect to start talking with the AI assistant.
-        </div>
+    <button id="connectBtn">🎤 اتصل وابدأ الحديث</button>
+    <button id="disconnectBtn" disabled>❌ قطع الاتصال</button>
 
-        <!-- Configuration Section -->
-        <div class="config-section">
-            <h3 style="margin-bottom: 15px; color: #333;">⚙️ Configuration</h3>
+    <div id="status">غير متصل</div>
+    <div id="audioContainer"></div>
 
-            <div class="form-group">
-                <label for="livekit-url">LiveKit Server URL</label>
-                <input type="text" id="livekit-url" placeholder="ws://localhost:7880 or wss://your-project.livekit.cloud" value="ws://localhost:7880">
-            </div>
+    <script type="module">
+        import { Room, RoomEvent, Track } from 'https://unpkg.com/livekit-client@2.5.8/dist/livekit-client.esm.mjs';
 
-            <div class="form-group">
-                <label for="api-url">FastAPI Backend URL (for token generation)</label>
-                <input type="text" id="api-url" placeholder="http://localhost:8000" value="http://localhost:8000">
-            </div>
+        const API_URL = 'http://localhost:8000';
 
-            <div class="form-group">
-                <label for="room-name">Room Name</label>
-                <input type="text" id="room-name" placeholder="test-room" value="test-room">
-            </div>
-
-            <div class="form-group">
-                <label for="participant-name">Your Name</label>
-                <input type="text" id="participant-name" placeholder="Test User" value="Test User">
-            </div>
-
-            <button class="btn-generate" id="generate-token">🔑 Generate Access Token</button>
-        </div>
-
-        <!-- Status -->
-        <div class="status disconnected" id="status">
-            ❌ Disconnected
-        </div>
-
-        <!-- Audio Indicator -->
-        <div class="audio-indicator hidden" id="audio-indicator">
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-            <div class="audio-bar"></div>
-        </div>
-
-        <!-- Controls -->
-        <div class="button-group">
-            <button class="btn-connect" id="connect-btn" disabled>🚀 Connect & Start</button>
-            <button class="btn-disconnect" id="disconnect-btn" disabled>🛑 Disconnect</button>
-        </div>
-
-        <!-- Stats -->
-        <div class="stats">
-            <div class="stat-card">
-                <div class="stat-label">Participants</div>
-                <div class="stat-value" id="participant-count">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Audio Tracks</div>
-                <div class="stat-value" id="track-count">0</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-label">Connection</div>
-                <div class="stat-value" id="connection-quality">-</div>
-            </div>
-        </div>
-
-        <!-- Conversation -->
-        <div class="transcription-box">
-            <h3>💬 Conversation</h3>
-            <div id="conversation"></div>
-        </div>
-
-        <!-- Audio Element (hidden) -->
-        <audio id="remote-audio" autoplay></audio>
-    </div>
-
-    <script>
-        const LivekitClient = window.LivekitClient;
-
-        // State
         let room = null;
-        let accessToken = null;
-        let participantCount = 0;
-        let trackCount = 0;
-
-        // DOM Elements
-        const livekitUrlInput = document.getElementById('livekit-url');
-        const apiUrlInput = document.getElementById('api-url');
-        const roomNameInput = document.getElementById('room-name');
-        const participantNameInput = document.getElementById('participant-name');
-        const generateTokenBtn = document.getElementById('generate-token');
-        const connectBtn = document.getElementById('connect-btn');
-        const disconnectBtn = document.getElementById('disconnect-btn');
         const statusDiv = document.getElementById('status');
-        const conversationDiv = document.getElementById('conversation');
-        const audioIndicator = document.getElementById('audio-indicator');
-        const remoteAudio = document.getElementById('remote-audio');
-        const participantCountEl = document.getElementById('participant-count');
-        const trackCountEl = document.getElementById('track-count');
-        const connectionQualityEl = document.getElementById('connection-quality');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const audioContainer = document.getElementById('audioContainer');
 
-        // Add message to conversation
-        function addMessage(type, text) {
-            const message = document.createElement('div');
-            message.className = `message ${type}`;
-
-            const timestamp = document.createElement('div');
-            timestamp.className = 'timestamp';
-            timestamp.textContent = new Date().toLocaleTimeString();
-
-            const content = document.createElement('div');
-            content.textContent = text;
-
-            message.appendChild(timestamp);
-            message.appendChild(content);
-            conversationDiv.appendChild(message);
-            conversationDiv.scrollTop = conversationDiv.scrollHeight;
-        }
-
-        // Update status
-        function updateStatus(status, message) {
-            statusDiv.className = `status ${status}`;
+        function updateStatus(message, type = '') {
             statusDiv.textContent = message;
+            statusDiv.className = type;
+            console.log('📢', message);
         }
 
-        // Update stats
-        function updateStats() {
-            participantCountEl.textContent = participantCount;
-            trackCountEl.textContent = trackCount;
-        }
-
-        // Generate Access Token
-        generateTokenBtn.addEventListener('click', async () => {
-            const apiUrl = apiUrlInput.value.trim();
-            const roomName = roomNameInput.value.trim();
-            const participantName = participantNameInput.value.trim();
-
-            if (!apiUrl || !roomName || !participantName) {
-                alert('Please fill in all fields');
-                return;
-            }
-
+        connectBtn.onclick = async () => {
             try {
-                generateTokenBtn.disabled = true;
-                generateTokenBtn.textContent = '⏳ Generating...';
+                connectBtn.disabled = true;
+                updateStatus('🎤 جاري طلب إذن الميكروفون...', 'warning');
 
-                const response = await fetch(`${apiUrl}/token`, {
+                // STEP 1: Request microphone permission FIRST
+                let stream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        audio: {
+                            echoCancellation: true,
+                            noiseSuppression: true,
+                            autoGainControl: true,
+                        }
+                    });
+                    updateStatus('✅ تم الحصول على إذن الميكروفون', 'connected');
+                    console.log('✅ Microphone access granted');
+                } catch (err) {
+                    updateStatus('❌ رُفض إذن الميكروفون! يرجى السماح بالوصول للميكروفون', 'error');
+                    console.error('❌ Microphone permission denied:', err);
+                    connectBtn.disabled = false;
+                    return;
+                }
+
+                // STEP 2: Request token from FastAPI
+                updateStatus('🔑 جاري طلب رمز الاتصال...', 'warning');
+
+                const response = await fetch(`${API_URL}/token`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        room_name: roomName,
-                        participant_name: participantName,
-                    }),
+                        room_name: 'harvard-voice-room',
+                        participant_name: `user-${Date.now()}`
+                    })
                 });
 
                 if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+                    throw new Error(`فشل الحصول على الرمز: ${response.status}`);
                 }
 
                 const data = await response.json();
-                accessToken = data.token;
+                console.log('✅ Token received:', data);
 
-                addMessage('system', '✅ Access token generated successfully');
-                connectBtn.disabled = false;
-                generateTokenBtn.textContent = '✅ Token Generated';
+                // STEP 3: Create room and connect
+                updateStatus('🔌 جاري الاتصال بالغرفة...', 'warning');
 
-            } catch (error) {
-                console.error('Token generation error:', error);
-                addMessage('system', `❌ Failed to generate token: ${error.message}`);
-                alert(`Failed to generate token: ${error.message}`);
-                generateTokenBtn.textContent = '🔑 Generate Access Token';
-            } finally {
-                generateTokenBtn.disabled = false;
-            }
-        });
-
-        // Connect to LiveKit
-        connectBtn.addEventListener('click', async () => {
-            const livekitUrl = livekitUrlInput.value.trim();
-
-            if (!accessToken) {
-                alert('Please generate an access token first');
-                return;
-            }
-
-            try {
-                connectBtn.disabled = true;
-                updateStatus('connecting', '⏳ Connecting...');
-
-                // Create room
-                room = new LivekitClient.Room({
+                room = new Room({
                     adaptiveStream: true,
                     dynacast: true,
+                    audioCaptureDefaults: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true,
+                    },
                 });
 
-                // Setup event listeners
-                setupRoomListeners();
+                // Set up event handlers BEFORE connecting
+                room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+                    console.log('🎵 Track subscribed:', track.kind, 'from', participant.identity);
 
-                // Connect to room
-                await room.connect(livekitUrl, accessToken);
+                    if (track.kind === Track.Kind.Audio) {
+                        const audioElement = track.attach();
+                        audioElement.autoplay = true;
+                        audioElement.volume = 1.0;
+                        audioContainer.appendChild(audioElement);
 
-                updateStatus('connected', '✅ Connected');
-                addMessage('system', '🎉 Connected to LiveKit room');
+                        console.log('🔊 Audio track attached and playing');
+                        updateStatus('🔊 متصل! الصوت نشط - تحدث الآن', 'connected');
+                    }
+                });
 
-                disconnectBtn.disabled = false;
-                audioIndicator.classList.remove('hidden');
+                room.on(RoomEvent.TrackUnsubscribed, (track) => {
+                    console.log('🔇 Track unsubscribed:', track.kind);
+                    track.detach().forEach(element => element.remove());
+                });
 
-                // Enable microphone
+                room.on(RoomEvent.Disconnected, (reason) => {
+                    console.log('❌ Disconnected:', reason);
+                    updateStatus('قُطع الاتصال', '');
+                    connectBtn.disabled = false;
+                    disconnectBtn.disabled = true;
+                    audioContainer.innerHTML = '';
+
+                    // Stop microphone stream
+                    if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                    }
+                });
+
+                room.on(RoomEvent.Connected, () => {
+                    console.log('✅ Successfully connected to room');
+                    updateStatus('✅ متصل بنجاح!', 'connected');
+                });
+
+                room.on(RoomEvent.ParticipantConnected, (participant) => {
+                    console.log('👤 Participant connected:', participant.identity);
+                });
+
+                // STEP 4: Connect to LiveKit room
+                console.log('Connecting to:', data.url);
+                await room.connect(data.url, data.token);
+
+                // STEP 5: Enable microphone
+                updateStatus('🎤 جاري تفعيل الميكروفون...', 'warning');
                 await room.localParticipant.setMicrophoneEnabled(true);
-                addMessage('system', '🎤 Microphone enabled - Start speaking!');
+
+                updateStatus('🎤 متصل! تحدث الآن وسيرد عليك المساعد', 'connected');
+                disconnectBtn.disabled = false;
+
+                console.log('✅ All set! Ready to talk');
 
             } catch (error) {
-                console.error('Connection error:', error);
-                updateStatus('disconnected', '❌ Connection failed');
-                addMessage('system', `❌ Connection failed: ${error.message}`);
-                alert(`Connection failed: ${error.message}`);
+                console.error('❌ Connection error:', error);
+                updateStatus(`❌ خطأ: ${error.message}`, 'error');
                 connectBtn.disabled = false;
-            }
-        });
 
-        // Disconnect
-        disconnectBtn.addEventListener('click', () => {
+                // Clean up on error
+                if (room) {
+                    room.disconnect();
+                    room = null;
+                }
+            }
+        };
+
+        disconnectBtn.onclick = () => {
             if (room) {
+                console.log('Disconnecting...');
                 room.disconnect();
                 room = null;
-                accessToken = null;
-                updateStatus('disconnected', '❌ Disconnected');
-                addMessage('system', '👋 Disconnected from room');
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = true;
-                audioIndicator.classList.add('hidden');
-                generateTokenBtn.textContent = '🔑 Generate Access Token';
-                participantCount = 0;
-                trackCount = 0;
-                updateStats();
+            }
+        };
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (room) {
+                room.disconnect();
             }
         });
-
-        // Setup room event listeners
-        function setupRoomListeners() {
-            // Participant joined
-            room.on(LivekitClient.RoomEvent.ParticipantConnected, (participant) => {
-                console.log('Participant connected:', participant.identity);
-                addMessage('system', `👤 ${participant.identity} joined`);
-                participantCount++;
-                updateStats();
-            });
-
-            // Participant left
-            room.on(LivekitClient.RoomEvent.ParticipantDisconnected, (participant) => {
-                console.log('Participant disconnected:', participant.identity);
-                addMessage('system', `👋 ${participant.identity} left`);
-                participantCount--;
-                updateStats();
-            });
-
-            // Track subscribed
-            room.on(LivekitClient.RoomEvent.TrackSubscribed, (track, publication, participant) => {
-                console.log('Track subscribed:', track.kind, 'from', participant.identity);
-
-                if (track.kind === LivekitClient.Track.Kind.Audio) {
-                    // Attach audio track to audio element
-                    const audioElement = track.attach();
-                    audioElement.play();
-
-                    addMessage('assistant', '🔊 Assistant is speaking...');
-                    trackCount++;
-                    updateStats();
-                }
-            });
-
-            // Track unsubscribed
-            room.on(LivekitClient.RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-                console.log('Track unsubscribed:', track.kind);
-                track.detach();
-                trackCount--;
-                updateStats();
-            });
-
-            // Data received (for transcriptions if implemented)
-            room.on(LivekitClient.RoomEvent.DataReceived, (payload, participant) => {
-                const decoder = new TextDecoder();
-                const message = decoder.decode(payload);
-                console.log('Data received:', message);
-
-                try {
-                    const data = JSON.parse(message);
-                    if (data.type === 'transcription') {
-                        addMessage('user', `You said: ${data.text}`);
-                    } else if (data.type === 'response') {
-                        addMessage('assistant', data.text);
-                    }
-                } catch (e) {
-                    console.log('Non-JSON data:', message);
-                }
-            });
-
-            // Connection quality changed
-            room.on(LivekitClient.RoomEvent.ConnectionQualityChanged, (quality, participant) => {
-                console.log('Connection quality:', quality);
-                connectionQualityEl.textContent = quality;
-            });
-
-            // Disconnected
-            room.on(LivekitClient.RoomEvent.Disconnected, (reason) => {
-                console.log('Disconnected:', reason);
-                updateStatus('disconnected', '❌ Disconnected');
-                addMessage('system', `Connection closed: ${reason || 'Unknown reason'}`);
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = true;
-                audioIndicator.classList.add('hidden');
-            });
-
-            // Reconnecting
-            room.on(LivekitClient.RoomEvent.Reconnecting, () => {
-                console.log('Reconnecting...');
-                updateStatus('connecting', '⏳ Reconnecting...');
-                addMessage('system', '🔄 Reconnecting...');
-            });
-
-            // Reconnected
-            room.on(LivekitClient.RoomEvent.Reconnected, () => {
-                console.log('Reconnected');
-                updateStatus('connected', '✅ Reconnected');
-                addMessage('system', '✅ Reconnected successfully');
-            });
-        }
-
-        // Initial message
-        addMessage('system', '👋 Welcome! Configure settings and click "Generate Access Token" to begin.');
     </script>
 </body>
+
 </html>

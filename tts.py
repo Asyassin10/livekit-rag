@@ -4,6 +4,7 @@ Optimized for CPU with streaming support
 """
 import logging
 import io
+import os
 import numpy as np
 from typing import AsyncGenerator, Optional
 from kokoro_onnx import Kokoro
@@ -19,8 +20,25 @@ class TextToSpeech:
         """Initialize Kokoro TTS pipeline"""
         logger.info(f"Loading Kokoro TTS with voice: {settings.TTS_VOICE}")
 
-        # Initialize Kokoro
-        self.kokoro = Kokoro(settings.TTS_VOICE, settings.WHISPER_LANGUAGE)
+        # Get paths from settings
+        model_path = settings.TTS_MODEL_PATH
+        voices_path = settings.TTS_VOICES_PATH
+        
+        # Check if files exist
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"Model file not found at {model_path}\n"
+                "Download it from: https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx"
+            )
+        
+        if not os.path.exists(voices_path):
+            raise FileNotFoundError(
+                f"Voices file not found at {voices_path}\n"
+                "Download it from: https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+            )
+
+        # Initialize Kokoro - CORRECT ORDER: model_path, voices_path
+        self.kokoro = Kokoro(model_path, voices_path)
         self.voice = settings.TTS_VOICE
         self.speed = settings.TTS_SPEED
 
@@ -43,9 +61,12 @@ class TextToSpeech:
 
             logger.info(f"Synthesizing: {text[:100]}...")
 
-            # Generate audio using Kokoro
-            # Returns tuple: (audio_array, sample_rate)
-            audio, sample_rate = self.kokoro.create(text, speed=self.speed)
+            # Generate audio using Kokoro with voice parameter
+            audio, sample_rate = self.kokoro.create(
+                text, 
+                voice=self.voice,
+                speed=self.speed
+            )
 
             # Convert to WAV bytes
             audio_bytes = self._to_wav_bytes(audio, sample_rate)

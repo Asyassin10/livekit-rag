@@ -31,8 +31,11 @@ class Settings(BaseSettings):
     LLM_TEMPERATURE: float = 0.7
     LLM_MAX_TOKENS: int = 150
 
+    # TTS Settings - Kokoro
     TTS_VOICE: str = "af_sarah"  # Kokoro French voice
     TTS_SPEED: float = 1.0
+    TTS_MODEL_PATH: str = "kokoro-models/kokoro-v1.0.int8.onnx"  # ADD THIS
+    TTS_VOICES_PATH: str = "kokoro-models/voices-v1.0.bin"       # ADD THIS
 
     # RAG Settings
     RAG_TOP_K: int = 3
