@@ -11,8 +11,6 @@ class Settings(BaseSettings):
     # API Keys - Required
     GROQ_API_KEY: str
     OPENROUTER_API_KEY: str
-    DEEPGRAM_API_KEY: str  # For STT
-    OPENAI_API_KEY: str    # For LLM and TTS
     LIVEKIT_URL: str
     LIVEKIT_API_KEY: str
     LIVEKIT_API_SECRET: str
@@ -37,6 +35,8 @@ class Settings(BaseSettings):
     # Kokoro TTS Settings
     TTS_VOICE: str = "af_sarah"
     TTS_SPEED: float = 1.0
+    TTS_MODEL_PATH: str = "kokoro-models/kokoro-v1.0.int8.onnx"
+    TTS_VOICES_PATH: str = "kokoro-models/voices-v1.0.bin"
 
     # RAG Settings
     RAG_TOP_K: int = 3
