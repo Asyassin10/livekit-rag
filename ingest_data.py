@@ -1,23 +1,25 @@
-import os
 import logging
 from pathlib import Path
 from typing import List, Dict
-from openai import OpenAI
+import httpx
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-from dotenv import load_dotenv
+from config import settings
 
-load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 class DataIngestor:
     def __init__(self):
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        self.qdrant_client = QdrantClient(url=os.getenv("QDRANT_URL", "http://localhost:6333"))
-        self.collection_name = os.getenv("QDRANT_COLLECTION", "harvard")
-        self.embedding_model = "text-embedding-3-large"
+        self.qdrant_client = QdrantClient(url=settings.QDRANT_URL)
+        self.collection_name = settings.QDRANT_COLLECTION
+        self.embedding_model = settings.EMBEDDING_MODEL
+        self.openrouter_url = "https://openrouter.ai/api/v1/embeddings"
+        self.headers = {
+            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Content-Type": "application/json",
+        }
         self.chunk_size = 1000
         self.chunk_overlap = 200
 
@@ -40,11 +42,18 @@ class DataIngestor:
         return chunks
 
     def get_embedding(self, text: str) -> List[float]:
-        response = self.openai_client.embeddings.create(
-            model=self.embedding_model,
-            input=text
-        )
-        return response.data[0].embedding
+        with httpx.Client(timeout=30.0) as client:
+            response = client.post(
+                self.openrouter_url,
+                headers=self.headers,
+                json={
+                    "model": self.embedding_model,
+                    "input": text,
+                },
+            )
+            response.raise_for_status()
+            data = response.json()
+            return data["data"][0]["embedding"]
 
     def create_collection(self, vector_size: int):
         try:
