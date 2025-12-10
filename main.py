@@ -9,7 +9,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from livekit import rtc
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from livekit import rtc, api
 from livekit.agents import (
     Agent,
     AgentSession,
@@ -201,6 +203,21 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Add CORS middleware for web client
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify exact origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+# Token request model
+class TokenRequest(BaseModel):
+    room_name: str
+    participant_name: str
+
 
 @app.get("/")
 async def root():
@@ -228,6 +245,49 @@ async def webhook(request: Request):
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         return JSONResponse({"status": "error", "message": str(e)}, status_code=500)
+
+
+@app.post("/token")
+async def generate_token(request: TokenRequest):
+    """Generate LiveKit access token for client"""
+    try:
+        # Create access token
+        token = api.AccessToken(
+            api_key=settings.LIVEKIT_API_KEY,
+            api_secret=settings.LIVEKIT_API_SECRET,
+        )
+
+        # Set identity and grants
+        token.with_identity(request.participant_name)
+        token.with_name(request.participant_name)
+        token.with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=request.room_name,
+                can_publish=True,
+                can_subscribe=True,
+                can_publish_data=True,
+            )
+        )
+
+        # Generate JWT
+        access_token = token.to_jwt()
+
+        logger.info(f"Generated token for {request.participant_name} in room {request.room_name}")
+
+        return {
+            "token": access_token,
+            "url": settings.LIVEKIT_URL,
+            "room": request.room_name,
+            "participant": request.participant_name,
+        }
+
+    except Exception as e:
+        logger.error(f"Token generation error: {e}")
+        return JSONResponse(
+            {"status": "error", "message": str(e)},
+            status_code=500
+        )
 
 
 def main():
