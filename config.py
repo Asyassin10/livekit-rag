@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     LLM_MAX_TOKENS: int = 150
 
     # Kokoro TTS Settings
-    TTS_VOICE: str = "af_sarah"
+    TTS_VOICE: str = "ff_siwis"
     TTS_SPEED: float = 1.0
     TTS_MODEL_PATH: str = "kokoro-models/kokoro-v1.0.int8.onnx"
     TTS_VOICES_PATH: str = "kokoro-models/voices-v1.0.bin"
