@@ -1,36 +1,11 @@
-# FastAPI and server
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-python-multipart>=0.0.6
-
-# LiveKit Agents v1.x with plugins
-livekit>=1.0.0
-livekit-agents[openai,silero,deepgram,cartesia]>=1.0.0
-
-# Alternative: install plugins separately
-# livekit-agents>=1.0.0
-# livekit-plugins-silero>=1.0.0
-# livekit-plugins-openai>=1.0.0
-# livekit-plugins-deepgram>=1.0.0
-# livekit-plugins-cartesia>=1.0.0
-
-# For Groq support (if using Groq LLM)
-# livekit-plugins-groq>=1.0.0
-
-# For ElevenLabs TTS (if using ElevenLabs)
-# livekit-plugins-elevenlabs>=1.0.0
-
-# RAG and Vector Database
+websockets>=12.0
+faster-whisper>=0.10.0
+groq>=0.4.0
+kokoro-onnx>=0.1.0
 qdrant-client>=1.7.0
 httpx>=0.26.0
-
-# Audio processing
 soundfile>=0.12.0
-
-# Configuration
+numpy>=1.24.0
 pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
-
-# Utilities
-aiofiles>=23.2.0
