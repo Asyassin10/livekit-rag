@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Harvard Assistant</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #0f172a;
+            color: #fff;
+        }
+        h1 {
+            text-align: center;
+            color: #3b82f6;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 8px;
+            background: #1e293b;
+        }
+        .status.connected {
+            background: #065f46;
+        }
+        .status.recording {
+            background: #7c2d12;
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        #connectBtn {
+            background: #3b82f6;
+            color: white;
+        }
+        #recordBtn {
+            background: #ef4444;
+            color: white;
+        }
+        #recordBtn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-size: 14px;
+        }
+        .log div {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #3b82f6;
+            padding-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Harvard Assistant</h1>
+
+    <div class="status" id="status">Disconnected</div>
+
+    <button id="connectBtn">Connect</button>
+    <button id="recordBtn" disabled>Hold to Talk</button>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        let ws = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+
+        const connectBtn = document.getElementById('connectBtn');
+        const recordBtn = document.getElementById('recordBtn');
+        const status = document.getElementById('status');
+        const log = document.getElementById('log');
+
+        function addLog(message) {
+            const div = document.createElement('div');
+            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        connectBtn.addEventListener('click', async () => {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.close();
+                return;
+            }
+
+            try {
+                ws = new WebSocket('ws://localhost:8765');
+
+                ws.onopen = () => {
+                    status.textContent = 'Connected';
+                    status.className = 'status connected';
+                    connectBtn.textContent = 'Disconnect';
+                    recordBtn.disabled = false;
+                    addLog('Connected to server');
+                };
+
+                ws.onclose = () => {
+                    status.textContent = 'Disconnected';
+                    status.className = 'status';
+                    connectBtn.textContent = 'Connect';
+                    recordBtn.disabled = true;
+                    addLog('Disconnected from server');
+                };
+
+                ws.onmessage = async (event) => {
+                    if (event.data instanceof Blob) {
+                        addLog('Received audio response');
+                        const audioBlob = event.data;
+                        const audioUrl = URL.createObjectURL(audioBlob);
+                        const audio = new Audio(audioUrl);
+                        await audio.play();
+                        addLog('Playing response');
+                    } else {
+                        const data = JSON.parse(event.data);
+                        addLog(`Server: ${JSON.stringify(data)}`);
+                    }
+                };
+
+                ws.onerror = (error) => {
+                    addLog(`Error: ${error.message}`);
+                };
+
+            } catch (error) {
+                addLog(`Connection error: ${error.message}`);
+            }
+        });
+
+        recordBtn.addEventListener('mousedown', async () => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+
+                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    ws.send(arrayBuffer);
+
+                    addLog('Sent audio to server');
+                    status.textContent = 'Processing...';
+
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                status.textContent = 'Recording...';
+                status.className = 'status recording';
+                addLog('Recording started');
+
+            } catch (error) {
+                addLog(`Microphone error: ${error.message}`);
+            }
+        });
+
+        recordBtn.addEventListener('mouseup', () => {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                status.textContent = 'Connected';
+                status.className = 'status connected';
+                addLog('Recording stopped');
+            }
+        });
+
+        recordBtn.addEventListener('touchstart', async (e) => {
+            e.preventDefault();
+            recordBtn.dispatchEvent(new Event('mousedown'));
+        });
+
+        recordBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            recordBtn.dispatchEvent(new Event('mouseup'));
+        });
+    </script>
+</body>
+</html>
