@@ -1,97 +1,352 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
+
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Harvard Assistant</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 600px;
-            margin: 50px auto;
-            padding: 20px;
-            background: #0f172a;
-            color: #fff;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: #000000;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+        }
+
         h1 {
             text-align: center;
-            color: #3b82f6;
+            font-size: 1.8rem;
+            margin-bottom: 20px;
+            color: #000000;
+            font-weight: 600;
         }
-        .status {
-            text-align: center;
-            padding: 10px;
-            margin: 20px 0;
-            border-radius: 8px;
-            background: #1e293b;
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 20px;
+            background: #f7f7f8;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #e5e5e5;
         }
-        .status.connected {
-            background: #065f46;
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #d1d1d6;
+            transition: background 0.3s;
         }
-        .status.recording {
-            background: #7c2d12;
+
+        .status-dot.connected {
+            background: #000000;
         }
-        button {
-            width: 100%;
-            padding: 15px;
-            font-size: 18px;
+
+        .status-dot.recording {
+            background: #000000;
+            animation: pulse 1s infinite;
+        }
+
+        .status-dot.processing {
+            background: #6b6b6b;
+            animation: pulse 0.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.5;
+                transform: scale(1.2);
+            }
+        }
+
+        .status-text {
+            font-size: 0.9rem;
+            color: #6b6b6b;
+            font-weight: 500;
+        }
+
+        .mic-btn {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
             border: none;
-            border-radius: 8px;
+            background: #000000;
+            color: white;
+            font-size: 48px;
             cursor: pointer;
-            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 30px auto;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
         }
-        #connectBtn {
-            background: #3b82f6;
-            color: white;
+
+        .mic-btn:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
         }
-        #recordBtn {
-            background: #ef4444;
-            color: white;
-        }
-        #recordBtn:disabled {
-            background: #6b7280;
+
+        .mic-btn:disabled {
+            background: #e5e5e5;
             cursor: not-allowed;
+            box-shadow: none;
+            color: #a1a1a6;
         }
-        .log {
-            background: #1e293b;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 20px;
-            max-height: 300px;
+
+        .mic-btn.recording {
+            background: #000000;
+            box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.5);
+            animation: recording-pulse 1.5s infinite;
+        }
+
+        @keyframes recording-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 0 15px rgba(0, 0, 0, 0);
+            }
+
+            100% {
+                box-shadow: 0 0 0 0 rgba(0, 0, 0, 0);
+            }
+        }
+
+        .mic-btn.processing {
+            background: #6b6b6b;
+            pointer-events: none;
+        }
+
+        .hint {
+            text-align: center;
+            color: #8e8e93;
+            font-size: 0.85rem;
+            margin-bottom: 20px;
+            font-weight: 400;
+        }
+
+        .chat-box {
+            background: #f7f7f8;
+            border-radius: 16px;
+            padding: 16px;
+            max-height: 350px;
             overflow-y: auto;
-            font-size: 14px;
+            border: 1px solid #e5e5e5;
         }
-        .log div {
-            margin: 5px 0;
-            padding: 5px;
-            border-left: 3px solid #3b82f6;
-            padding-left: 10px;
+
+        .message {
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+
+        .message.user {
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            color: #000000;
+        }
+
+        .message.assistant {
+            background: #000000;
+            color: #ffffff;
+        }
+
+        .message.error {
+            background: #f0f0f0;
+            border: 1px solid #d1d1d6;
+            color: #6b6b6b;
+        }
+
+        .message-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            opacity: 0.7;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .connect-btn {
+            width: 100%;
+            padding: 14px;
+            background: #000000;
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .connect-btn:hover {
+            background: #2d2d2d;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .connect-btn.disconnect {
+            background: #ffffff;
+            color: #000000;
+            border: 2px solid #000000;
+        }
+
+        .connect-btn.disconnect:hover {
+            background: #f7f7f8;
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #000000;
+            margin: 10px 0;
+            display: none;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .timer.active {
+            display: block;
+        }
+
+        /* Scrollbar styling */
+        .chat-box::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .chat-box::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .chat-box::-webkit-scrollbar-thumb {
+            background: #d1d1d6;
+            border-radius: 3px;
+        }
+
+        .chat-box::-webkit-scrollbar-thumb:hover {
+            background: #a1a1a6;
         }
     </style>
 </head>
+
 <body>
-    <h1>Harvard Assistant</h1>
+    <div class="container">
+        <h1>🎓 Harvard Assistant</h1>
 
-    <div class="status" id="status">Disconnected</div>
+        <div class="status-bar">
+            <div class="status-dot" id="statusDot"></div>
+            <span class="status-text" id="statusText">Déconnecté</span>
+        </div>
 
-    <button id="connectBtn">Connect</button>
-    <button id="recordBtn" disabled>Hold to Talk</button>
+        <button class="connect-btn" id="connectBtn">Se connecter</button>
 
-    <div class="log" id="log"></div>
+        <button class="mic-btn" id="micBtn" disabled>🎤</button>
+        <div class="timer" id="timer">0:00</div>
+        <p class="hint" id="hint">Cliquez pour parler</p>
+
+        <div class="chat-box" id="chatBox"></div>
+    </div>
 
     <script>
+        const connectBtn = document.getElementById('connectBtn');
+        const micBtn = document.getElementById('micBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const chatBox = document.getElementById('chatBox');
+        const hint = document.getElementById('hint');
+        const timerEl = document.getElementById('timer');
+
         let ws = null;
         let mediaRecorder = null;
         let audioChunks = [];
         let isRecording = false;
+        let stream = null;
+        let timerInterval = null;
+        let seconds = 0;
 
-        const connectBtn = document.getElementById('connectBtn');
-        const recordBtn = document.getElementById('recordBtn');
-        const status = document.getElementById('status');
-        const log = document.getElementById('log');
+        // Request mic permission once on page load
+        async function initMicrophone() {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        sampleRate: 16000,
+                    }
+                });
+                addMessage('Microphone prêt', 'system');
+                return true;
+            } catch (e) {
+                addMessage('Erreur: Accès microphone refusé', 'error');
+                return false;
+            }
+        }
 
-        function addLog(message) {
+        function setStatus(state, text) {
+            statusDot.className = 'status-dot ' + state;
+            statusText.textContent = text;
+        }
+
+        function addMessage(text, type) {
             const div = document.createElement('div');
-            div.textContent = `${new Date().toLocaleTimeString()} - ${message}`;
-            log.appendChild(div);
-            log.scrollTop = log.scrollHeight;
+            div.className = 'message ' + type;
+
+            let label = '';
+            if (type === 'user') label = '👤 Vous';
+            else if (type === 'assistant') label = '🤖 Assistant';
+
+            div.innerHTML = label ? `<div class="message-label">${label}</div>${text}` : text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function updateTimer() {
+            seconds++;
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            timerEl.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            seconds = 0;
+            timerEl.classList.add('active');
+            timerEl.textContent = '0:00';
+            timerInterval = setInterval(updateTimer, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            timerEl.classList.remove('active');
         }
 
         connectBtn.addEventListener('click', async () => {
@@ -100,102 +355,123 @@
                 return;
             }
 
-            try {
-                ws = new WebSocket('ws://localhost:8765');
-
-                ws.onopen = () => {
-                    status.textContent = 'Connected';
-                    status.className = 'status connected';
-                    connectBtn.textContent = 'Disconnect';
-                    recordBtn.disabled = false;
-                    addLog('Connected to server');
-                };
-
-                ws.onclose = () => {
-                    status.textContent = 'Disconnected';
-                    status.className = 'status';
-                    connectBtn.textContent = 'Connect';
-                    recordBtn.disabled = true;
-                    addLog('Disconnected from server');
-                };
-
-                ws.onmessage = async (event) => {
-                    if (event.data instanceof Blob) {
-                        addLog('Received audio response');
-                        const audioBlob = event.data;
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        const audio = new Audio(audioUrl);
-                        await audio.play();
-                        addLog('Playing response');
-                    } else {
-                        const data = JSON.parse(event.data);
-                        addLog(`Server: ${JSON.stringify(data)}`);
-                    }
-                };
-
-                ws.onerror = (error) => {
-                    addLog(`Error: ${error.message}`);
-                };
-
-            } catch (error) {
-                addLog(`Connection error: ${error.message}`);
+            // Init mic if not done
+            if (!stream) {
+                const ok = await initMicrophone();
+                if (!ok) return;
             }
+
+            setStatus('', 'Connexion...');
+
+            ws = new WebSocket('ws://localhost:8765');
+
+            ws.onopen = () => {
+                setStatus('connected', 'Connecté');
+                connectBtn.textContent = 'Se déconnecter';
+                connectBtn.classList.add('disconnect');
+                micBtn.disabled = false;
+                hint.textContent = 'Cliquez pour parler';
+            };
+
+            ws.onclose = () => {
+                setStatus('', 'Déconnecté');
+                connectBtn.textContent = 'Se connecter';
+                connectBtn.classList.remove('disconnect');
+                micBtn.disabled = true;
+                micBtn.classList.remove('recording', 'processing');
+                hint.textContent = 'Connectez-vous d\'abord';
+                stopTimer();
+            };
+
+            ws.onmessage = async (event) => {
+                if (event.data instanceof Blob) {
+                    // Audio response
+                    setStatus('connected', 'Lecture...');
+                    const url = URL.createObjectURL(event.data);
+                    const audio = new Audio(url);
+                    audio.onended = () => {
+                        setStatus('connected', 'Connecté');
+                        hint.textContent = 'Cliquez pour parler';
+                        micBtn.classList.remove('processing');
+                        micBtn.disabled = false;
+                    };
+                    await audio.play();
+                } else {
+                    // JSON transcript
+                    try {
+                        const data = JSON.parse(event.data);
+                        if (data.user) addMessage(data.user, 'user');
+                        if (data.assistant) addMessage(data.assistant, 'assistant');
+                        if (data.error) addMessage(data.error, 'error');
+                    } catch (e) {
+                        console.log('Message:', event.data);
+                    }
+                }
+            };
+
+            ws.onerror = () => {
+                addMessage('Erreur de connexion', 'error');
+            };
         });
 
-        recordBtn.addEventListener('mousedown', async () => {
+        micBtn.addEventListener('click', async () => {
             if (!ws || ws.readyState !== WebSocket.OPEN) return;
 
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
+            if (!isRecording) {
+                // Start recording
                 audioChunks = [];
 
-                mediaRecorder.ondataavailable = (event) => {
-                    audioChunks.push(event.data);
+                mediaRecorder = new MediaRecorder(stream, {
+                    mimeType: 'audio/webm;codecs=opus'
+                });
+
+                mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
                 };
 
                 mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    stopTimer();
 
-                    const arrayBuffer = await audioBlob.arrayBuffer();
+                    const blob = new Blob(audioChunks, { type: 'audio/webm' });
+
+                    // Convert to WAV for better compatibility
+                    const arrayBuffer = await blob.arrayBuffer();
                     ws.send(arrayBuffer);
 
-                    addLog('Sent audio to server');
-                    status.textContent = 'Processing...';
-
-                    stream.getTracks().forEach(track => track.stop());
+                    setStatus('processing', 'Traitement...');
+                    micBtn.classList.remove('recording');
+                    micBtn.classList.add('processing');
+                    micBtn.innerHTML = '⏳';
+                    micBtn.disabled = true;
+                    hint.textContent = 'Analyse en cours...';
                 };
 
-                mediaRecorder.start();
+                mediaRecorder.start(100);
                 isRecording = true;
-                status.textContent = 'Recording...';
-                status.className = 'status recording';
-                addLog('Recording started');
+                micBtn.classList.add('recording');
+                micBtn.innerHTML = '⏹️';
+                setStatus('recording', 'Enregistrement...');
+                hint.textContent = 'Cliquez pour arrêter';
+                startTimer();
 
-            } catch (error) {
-                addLog(`Microphone error: ${error.message}`);
-            }
-        });
-
-        recordBtn.addEventListener('mouseup', () => {
-            if (mediaRecorder && isRecording) {
+            } else {
+                // Stop recording
                 mediaRecorder.stop();
                 isRecording = false;
-                status.textContent = 'Connected';
-                status.className = 'status connected';
-                addLog('Recording stopped');
             }
         });
 
-        recordBtn.addEventListener('touchstart', async (e) => {
-            e.preventDefault();
-            recordBtn.dispatchEvent(new Event('mousedown'));
+        // Keyboard shortcut: Space to toggle recording
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat && document.activeElement.tagName !== 'INPUT') {
+                e.preventDefault();
+                micBtn.click();
+            }
         });
 
-        recordBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            recordBtn.dispatchEvent(new Event('mouseup'));
-        });
+        // Init on load
+        initMicrophone();
     </script>
 </body>
+
 </html>

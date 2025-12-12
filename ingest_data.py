@@ -17,7 +17,7 @@ class DataIngestor:
         self.embedding_model = settings.EMBEDDING_MODEL
         self.openrouter_url = "https://openrouter.ai/api/v1/embeddings"
         self.headers = {
-            "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
+            "Authorization": f"Bearer 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",
             "Content-Type": "application/json",
         }
         self.chunk_size = 1000

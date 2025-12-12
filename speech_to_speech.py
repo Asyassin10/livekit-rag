@@ -6,10 +6,8 @@ import tempfile
 import os
 import wave
 import numpy as np
-from pathlib import Path
 import httpx
 from faster_whisper import WhisperModel
-from groq import AsyncGroq
 from kokoro_onnx import Kokoro
 from qdrant_client import QdrantClient
 from config import settings, SYSTEM_PROMPT
@@ -23,188 +21,205 @@ class SpeechToSpeechRAG:
     def __init__(self):
         logger.info("Initializing Speech-to-Speech RAG system")
 
+        # Whisper - optimized for speed
         self.whisper_model = WhisperModel(
             settings.WHISPER_MODEL,
             device="cpu",
-            compute_type=settings.WHISPER_COMPUTE_TYPE,
-            cpu_threads=4,
+            compute_type="int8",
+            cpu_threads=os.cpu_count() or 4,
         )
         logger.info("Whisper model loaded")
-
-        self.groq_client = AsyncGroq(api_key=settings.GROQ_API_KEY)
-        logger.info("Groq client initialized")
 
         self.kokoro = Kokoro(settings.TTS_MODEL_PATH, settings.TTS_VOICES_PATH)
         logger.info("Kokoro TTS loaded")
 
         self.qdrant_client = QdrantClient(url=settings.QDRANT_URL)
         self.collection_name = settings.QDRANT_COLLECTION
+        
+        # Reusable HTTP client
+        self.http_client = httpx.AsyncClient(timeout=60.0)
+        
+        # OpenRouter for embeddings
         self.openrouter_url = "https://openrouter.ai/api/v1/embeddings"
         self.openrouter_headers = {
             "Authorization": f"Bearer {settings.OPENROUTER_API_KEY}",
             "Content-Type": "application/json",
         }
-        logger.info("Qdrant client connected")
+        
+        # Ollama for LLM
+        self.ollama_url = "http://localhost:11434/api/chat"
+        
+        logger.info("All services initialized")
 
     def transcribe_audio(self, audio_bytes: bytes) -> str:
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_file:
-            temp_file.write(audio_bytes)
-            temp_path = temp_file.name
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
+            f.write(audio_bytes)
+            temp_path = f.name
 
         try:
             segments, _ = self.whisper_model.transcribe(
                 temp_path,
-                language=settings.WHISPER_LANGUAGE,
-                beam_size=5,
+                language="fr",
+                beam_size=3,
                 vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=300),
             )
-            transcription = " ".join([segment.text.strip() for segment in segments])
-            return transcription.strip()
+            return " ".join(s.text.strip() for s in segments).strip()
         finally:
             os.unlink(temp_path)
 
     async def get_embedding(self, text: str):
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.post(
-                self.openrouter_url,
-                headers=self.openrouter_headers,
-                json={
-                    "model": settings.EMBEDDING_MODEL,
-                    "input": text,
-                },
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data["data"][0]["embedding"]
+        response = await self.http_client.post(
+            self.openrouter_url,
+            headers=self.openrouter_headers,
+            json={"model": settings.EMBEDDING_MODEL, "input": text},
+        )
+        response.raise_for_status()
+        return response.json()["data"][0]["embedding"]
 
     async def search_qdrant(self, query: str):
         query_embedding = await self.get_embedding(query)
-
-        search_results = self.qdrant_client.search(
+        
+        results = self.qdrant_client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_embedding,
+            query=query_embedding,
             limit=settings.RAG_TOP_K,
             score_threshold=settings.RAG_SCORE_THRESHOLD,
         )
 
-        documents = []
-        for result in search_results:
-            documents.append({
-                "text": result.payload.get("text", ""),
-                "score": result.score,
-            })
-
-        return documents
+        return [
+            {"text": r.payload.get("text", ""), "score": r.score}
+            for r in results.points
+        ]
 
     def format_context(self, documents):
         if not documents:
             return None
-
-        context_parts = []
-        for i, doc in enumerate(documents, 1):
-            text = doc.get("text", "").strip()
-            if text:
-                context_parts.append(f"[Document {i}]: {text}")
-
-        return "\n\n".join(context_parts)
+        return "\n\n".join(
+            f"[Document {i}]: {doc['text'].strip()}"
+            for i, doc in enumerate(documents, 1)
+            if doc.get("text", "").strip()
+        )
 
     async def generate_response(self, user_message: str, context: str = None):
         if context:
-            user_prompt = f"""Contexte:
-{context}
-
-Question: {user_message}"""
+            user_prompt = f"Contexte:\n{context}\n\nQuestion: {user_message}"
         else:
             user_prompt = user_message
 
-        response = await self.groq_client.chat.completions.create(
-            model=settings.LLM_MODEL,
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=settings.LLM_TEMPERATURE,
-            max_tokens=settings.LLM_MAX_TOKENS,
+        response = await self.http_client.post(
+            self.ollama_url,
+            json={
+                "model": "qwen2.5:7b",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt},
+                ],
+                "stream": False,
+                "options": {
+                    "temperature": settings.LLM_TEMPERATURE,
+                    "num_predict": settings.LLM_MAX_TOKENS,
+                }
+            },
+            timeout=120.0,
         )
-
-        return response.choices[0].message.content
+        response.raise_for_status()
+        data = response.json()
+        return data["message"]["content"]
 
     def synthesize_speech(self, text: str) -> bytes:
         audio, sample_rate = self.kokoro.create(
             text,
             voice=settings.TTS_VOICE,
-            speed=settings.TTS_SPEED
+            speed=settings.TTS_SPEED,
+            lang="fr-fr",
         )
 
         audio = np.clip(audio, -1.0, 1.0)
         audio_int16 = (audio * 32767).astype(np.int16)
 
         buffer = io.BytesIO()
-        with wave.open(buffer, 'wb') as wav_file:
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(sample_rate)
-            wav_file.writeframes(audio_int16.tobytes())
-
+        with wave.open(buffer, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(sample_rate)
+            wav.writeframes(audio_int16.tobytes())
         return buffer.getvalue()
 
     async def process_voice(self, audio_bytes: bytes):
-        logger.info("Transcribing audio")
+        logger.info("Transcribing...")
         transcription = self.transcribe_audio(audio_bytes)
 
         if not transcription:
-            return None
+            return None, None
 
         logger.info(f"User: {transcription}")
 
-        logger.info("Searching knowledge base")
+        logger.info("Searching...")
         documents = await self.search_qdrant(transcription)
         context = self.format_context(documents)
-
+        
         if documents:
-            logger.info(f"Found {len(documents)} documents")
+            logger.info(f"Found {len(documents)} docs")
 
-        logger.info("Generating response")
+        logger.info("Generating with Qwen2.5...")
         response_text = await self.generate_response(transcription, context)
         logger.info(f"Assistant: {response_text}")
 
-        logger.info("Synthesizing speech")
-        audio_response = self.synthesize_speech(response_text)
+        logger.info("Synthesizing...")
+        audio = self.synthesize_speech(response_text)
 
-        return audio_response
+        return audio, {"user": transcription, "assistant": response_text}
 
 
-async def handle_client(websocket, path):
-    logger.info(f"Client connected from {websocket.remote_address}")
+# Global instance for reuse
+rag_system = None
 
-    system = SpeechToSpeechRAG()
+
+async def get_system():
+    global rag_system
+    if rag_system is None:
+        rag_system = SpeechToSpeechRAG()
+    return rag_system
+
+
+async def handle_client(websocket):
+    logger.info(f"Client connected: {websocket.remote_address}")
+    system = await get_system()
 
     try:
         async for message in websocket:
             if isinstance(message, bytes):
-                logger.info("Received audio data")
+                logger.info("Processing audio...")
+                
+                audio, transcript = await system.process_voice(message)
 
-                audio_response = await system.process_voice(message)
-
-                if audio_response:
-                    await websocket.send(audio_response)
-                    logger.info("Sent audio response")
+                if audio:
+                    await websocket.send(json.dumps(transcript))
+                    await websocket.send(audio)
+                    logger.info("Response sent")
                 else:
                     await websocket.send(json.dumps({"error": "No transcription"}))
-            else:
-                logger.warning("Received non-binary message")
 
     except websockets.exceptions.ConnectionClosed:
         logger.info("Client disconnected")
     except Exception as e:
-        logger.error(f"Error: {e}")
+        logger.error(f"Error: {e}", exc_info=True)
 
 
 async def main():
-    logger.info("Starting WebSocket server on port 8765")
-
-    async with websockets.serve(handle_client, "0.0.0.0", 8765):
-        logger.info("Server ready - waiting for connections")
+    logger.info("Starting server on port 8765")
+    
+    # Pre-initialize system
+    await get_system()
+    
+    async with websockets.serve(
+        handle_client,
+        "0.0.0.0",
+        8765,
+        max_size=10 * 1024 * 1024,
+    ):
+        logger.info("Server ready")
         await asyncio.Future()
 
 
