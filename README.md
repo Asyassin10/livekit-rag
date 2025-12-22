@@ -1,207 +1,67 @@
-# Harvard Voice Assistant
+# Voice AI Assistant
 
-Simple speech-to-speech AI assistant with RAG (Retrieval-Augmented Generation).
+WebSocket-based speech-to-speech AI assistant with RAG for Harvard University queries.
 
-## 🎯 Workflow
+## Stack
 
-```
-Browser (Your Voice)
-    ↓
-STT (Speech-to-Text) - Deepgram
-    ↓
-RAG (Retrieval) - Qdrant + OpenRouter Embeddings
-    ↓
-LLM (Answer) - OpenAI/Groq
-    ↓
-TTS (Text-to-Speech) - OpenAI
-    ↓
-Browser (Assistant Voice)
-```
+- **STT**: Whisper (faster-whisper)
+- **RAG**: Qdrant + OpenRouter embeddings
+- **LLM**: Qwen2.5 (via Ollama)
+- **TTS**: Kokoro
+- **Interface**: WebSocket + HTML client
 
-## 📦 Requirements
+## Setup
 
-- Python 3.11+
-- Qdrant (vector database)
-- LiveKit server (local or cloud)
-- API keys: Deepgram, OpenAI, OpenRouter, Groq
-
-## 🚀 Quick Start
-
-### 1. Install Dependencies
-
+1. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Setup Environment
-
-Edit `.env` file:
-
+2. Configure `.env`:
 ```bash
-# API Keys - GET THESE FROM:
-# Deepgram: https://deepgram.com (for STT)
-# OpenAI: https://openai.com (for LLM and TTS)
-# OpenRouter: https://openrouter.ai (for embeddings)
-# Groq: https://groq.com (alternative LLM)
-
-DEEPGRAM_API_KEY=your_key_here
-OPENAI_API_KEY=your_key_here
-OPENROUTER_API_KEY=your_key_here
-GROQ_API_KEY=your_key_here
-
-# LiveKit (local or cloud)
-LIVEKIT_URL=ws://localhost:7880
-LIVEKIT_API_KEY=harvardkey
-LIVEKIT_API_SECRET=harvard_secret_key_2024xyz
-
-# Qdrant
+GROQ_API_KEY=your_key
+OPENROUTER_API_KEY=your_key
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION=harvard
 ```
 
-### 3. Start Qdrant
-
+3. Start services:
 ```bash
+# Qdrant
 docker run -d -p 6333:6333 qdrant/qdrant
+
+# Ollama with Qwen2.5
+ollama pull qwen2.5:7b
 ```
 
-### 4. Start LiveKit (if using local)
-
+4. Ingest data (optional):
 ```bash
-docker run -d -p 7880:7880 livekit/livekit-server --dev
+python ingest_data.py
 ```
 
-Or use LiveKit Cloud: https://cloud.livekit.io
-
-### 5. Start Token Server
-
+5. Run server:
 ```bash
-python server.py
+python speech_to_speech.py
 ```
 
-Expected output:
-```
-INFO: Uvicorn running on http://0.0.0.0:8000
-```
+6. Open `client.html` in browser and start speaking!
 
-### 6. Start Voice Agent
+## How It Works
 
-Open a NEW terminal:
+1. Speak into microphone
+2. Whisper transcribes audio → text
+3. RAG retrieves relevant Harvard docs from Qdrant
+4. Qwen2.5 generates French response
+5. Kokoro synthesizes speech
+6. Audio plays in browser
 
-```bash
-python main.py dev
-```
+## Files
 
-Expected output:
-```
-INFO - registered worker
-INFO - Agent starting...
-```
-
-### 7. Open Browser Client
-
-Open `test_client.html` in your browser:
-
-```bash
-open test_client.html
-```
-
-Click "اتصل وابدأ الحديث" (Connect) and start speaking!
-
-## 📁 Files
-
-- `main.py` - Voice agent (STT → RAG → LLM → TTS)
-- `server.py` - Token generation server
-- `test_client.html` - Web interface
+- `speech_to_speech.py` - Main WebSocket server
 - `config.py` - Configuration
-- `stt.py` - Speech-to-text (not used with pipeline)
-- `rag.py` - RAG retrieval with Qdrant
-- `llm.py` - LLM interface (not used with pipeline)
-- `tts.py` - Text-to-speech (not used with pipeline)
+- `ingest_data.py` - Load documents into Qdrant
+- `client.html` - Browser interface
 
-## 🎤 How It Works
-
-1. **You speak** in the browser
-2. **Deepgram STT** transcribes your voice to text
-3. **RAG** searches Qdrant for relevant Harvard info
-4. **OpenAI LLM** generates a French response
-5. **OpenAI TTS** converts text to speech
-6. **You hear** the assistant's response
-
-## 🧪 Testing
-
-### Test Token Generation
-
-```bash
-curl -X POST http://localhost:8000/token \
-  -H "Content-Type: application/json" \
-  -d '{"room_name":"test","participant_name":"user"}'
-```
-
-### Test Qdrant
-
-```bash
-curl http://localhost:6333/health
-```
-
-## 🔧 Troubleshooting
-
-### "Token generation failed"
-- Make sure `server.py` is running
-- Check http://localhost:8000/health
-
-### "Connection failed"
-- Make sure LiveKit server is running
-- Check LiveKit URL in `.env`
-
-### "No voice response"
-- Make sure `main.py` agent is running
-- Check API keys in `.env`
-- Look at terminal logs for errors
-
-### "Can't hear greeting"
-- Allow microphone access in browser
-- Check browser console for errors
-- Make sure you're using HTTPS (or localhost)
-
-## 📚 Add Documents to Qdrant
-
-```python
-import asyncio
-from rag import get_rag
-
-async def add_docs():
-    rag = get_rag()
-
-    docs = [
-        "Harvard University was founded in 1636 in Cambridge, Massachusetts.",
-        "Harvard is the oldest university in the United States.",
-    ]
-
-    for i, doc in enumerate(docs):
-        emb = await rag.get_embedding(doc)
-        rag.qdrant_client.upsert(
-            collection_name="harvard",
-            points=[{
-                "id": i + 1,
-                "vector": emb,
-                "payload": {"text": doc}
-            }]
-        )
-    print("✅ Documents added!")
-
-asyncio.run(add_docs())
-```
-
-## 🌐 Production
-
-For production:
-1. Use LiveKit Cloud
-2. Deploy `server.py` on a server
-3. Deploy `main.py` agent on a server
-4. Host `test_client.html` on web hosting
-5. Use HTTPS for all services
-
-## 📝 License
+## License
 
 MIT
